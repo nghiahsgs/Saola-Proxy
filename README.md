@@ -21,27 +21,55 @@ Saola Proxy intercepts communication between you and AI coding tools (Claude Cod
 ### Install
 
 ```bash
-# From source
+# Option 1: go install (requires Go 1.22+)
 go install github.com/nguyennghia/saola-proxy/cmd/saola@latest
 
-# Or download binary from GitHub Releases
+# Option 2: Build from source
+git clone https://github.com/nguyennghia/saola-proxy.git
+cd saola-proxy
+make build
+sudo cp bin/saola /usr/local/bin/   # or add bin/ to your PATH
+
+# Option 3: Download binary from GitHub Releases
+# https://github.com/nguyennghia/saola-proxy/releases
+```
+
+### Verify Installation
+
+```bash
+saola version
+# Output: saola version v0.1.0
 ```
 
 ### Usage
 
 ```bash
-# Wrap any CLI tool
+# Wrap any CLI tool with PII sanitization
 saola wrap -- claude
 
-# Wrap with explicit config
+# Works with any command
+saola wrap -- bash
+saola wrap -- python3 my_script.py
+
+# Wrap with explicit config file
 saola --config ~/.saola/config.yaml wrap -- claude
 
 # Initialize default config
 saola init
 
-# View audit stats
+# View audit stats from past sessions
 saola audit
 ```
+
+### Shortcut: Create an Alias
+
+Add to your `~/.zshrc` or `~/.bashrc`:
+
+```bash
+alias claude='saola wrap -- claude'
+```
+
+Then just type `claude` as usual — Saola runs transparently in the background.
 
 ### Example
 
@@ -49,6 +77,8 @@ saola audit
 $ echo "My API key is AKIAIOSFODNN7EXAMPLE and email is john@company.com" | saola wrap -- cat
 My API key is [AWS_ACCESS_KEY_1] and email is [EMAIL_1]
 ```
+
+The AI tool only sees `[AWS_ACCESS_KEY_1]` and `[EMAIL_1]`. Your real credentials never leave your machine.
 
 ## How It Works
 
