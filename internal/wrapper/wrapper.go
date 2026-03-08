@@ -69,14 +69,14 @@ func (w *Wrapper) runPTY() (int, error) {
 	// Forward SIGWINCH and other signals to child.
 	go HandleSignals(ctx, cancel, ptmx, cmd)
 
-	// stdin → PTY: rehydrate AI responses typed into the terminal.
+	// stdin → PTY: sanitize user input before it reaches the AI tool.
 	// Chunk-based: interactive typing is character-by-character.
-	inBridge := NewIOBridge(os.Stdin, ptmx, w.rehydrator.Rehydrate)
+	inBridge := NewIOBridge(os.Stdin, ptmx, w.sanitizer.Sanitize)
 	go func() { _ = inBridge.Run(ctx) }()
 
-	// PTY → stdout: sanitize output from the child process.
-	// Line-buffered: prevents secrets from being missed at chunk boundaries.
-	outBridge := NewLineBufferedIOBridge(ptmx, os.Stdout, w.sanitizer.Sanitize)
+	// PTY → stdout: rehydrate AI responses so user sees original values.
+	// Line-buffered: prevents placeholders from being missed at chunk boundaries.
+	outBridge := NewLineBufferedIOBridge(ptmx, os.Stdout, w.rehydrator.Rehydrate)
 	// Run outBridge in foreground to detect EOF from child exit.
 	_ = outBridge.Run(ctx)
 
@@ -120,26 +120,26 @@ func (w *Wrapper) runPipe() (int, error) {
 
 	var wg sync.WaitGroup
 
-	// stdin → child: rehydrate. Chunk-based for interactive compatibility.
+	// stdin → child: sanitize user input before it reaches the AI tool.
 	go func() {
 		defer stdinPipe.Close()
-		b := NewIOBridge(os.Stdin, stdinPipe, w.rehydrator.Rehydrate)
+		b := NewIOBridge(os.Stdin, stdinPipe, w.sanitizer.Sanitize)
 		_ = b.Run(ctx)
 	}()
 
-	// child stdout → our stdout: sanitize. Line-buffered to catch boundary secrets.
+	// child stdout → our stdout: rehydrate so user sees original values.
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		b := NewLineBufferedIOBridge(stdoutPipe, os.Stdout, w.sanitizer.Sanitize)
+		b := NewLineBufferedIOBridge(stdoutPipe, os.Stdout, w.rehydrator.Rehydrate)
 		_ = b.Run(ctx)
 	}()
 
-	// child stderr → our stderr: sanitize. Line-buffered to catch boundary secrets.
+	// child stderr → our stderr: rehydrate so user sees original values.
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		b := NewLineBufferedIOBridge(stderrPipe, os.Stderr, w.sanitizer.Sanitize)
+		b := NewLineBufferedIOBridge(stderrPipe, os.Stderr, w.rehydrator.Rehydrate)
 		_ = b.Run(ctx)
 	}()
 
