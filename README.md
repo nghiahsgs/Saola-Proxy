@@ -159,8 +159,7 @@ Audit logs track detection counts only (never PII values):
 
 ## Limitations
 
-- **Response rehydration** — Claude API uses SSE streaming for responses. Rehydrating placeholders in streaming responses is not yet supported. You'll see `[EMAIL_1]` in AI responses instead of the original value.
-- **macOS/Linux only** — Windows is not supported yet (PTY and Keychain differences).
+- **macOS/Linux only** — Windows is not supported yet (Keychain differences).
 
 ## Development
 

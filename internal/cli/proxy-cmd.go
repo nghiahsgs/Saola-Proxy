@@ -96,9 +96,11 @@ Then run your AI tool with the proxy:
 		}
 
 		addr := fmt.Sprintf(":%d", proxyPort)
-		ps := proxy.NewProxyServer(addr, san, reh, ca)
+		ps := proxy.NewProxyServer(addr, san, reh, ca, reg, table, session)
 
-		fmt.Fprintf(os.Stdout, "Saola proxy listening on :%d — Use: HTTPS_PROXY=http://localhost:%d claude\n", proxyPort, proxyPort)
+		fmt.Fprintf(os.Stdout, "Saola proxy listening on :%d\n", proxyPort)
+		fmt.Fprintf(os.Stdout, "Dashboard: http://localhost:%d\n", proxyPort)
+		fmt.Fprintf(os.Stdout, "Usage:     HTTPS_PROXY=http://localhost:%d claude\n", proxyPort)
 
 		// Graceful shutdown on SIGINT/SIGTERM.
 		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

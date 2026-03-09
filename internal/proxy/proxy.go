@@ -11,7 +11,9 @@ import (
 	"strings"
 
 	"github.com/elazarl/goproxy"
+	"github.com/nguyennghia/saola-proxy/internal/audit"
 	"github.com/nguyennghia/saola-proxy/internal/sanitizer"
+	"github.com/nguyennghia/saola-proxy/internal/scanner"
 )
 
 // ProxyServer is an HTTPS MITM proxy that sanitizes PII in API requests.
@@ -25,7 +27,8 @@ type ProxyServer struct {
 // NewProxyServer creates a ProxyServer that listens on addr and applies
 // PII sanitization to traffic targeting api.anthropic.com.
 // If ca is provided, it is used for MITM certificate signing.
-func NewProxyServer(addr string, san *sanitizer.Sanitizer, reh *sanitizer.Rehydrator, ca *tls.Certificate) *ProxyServer {
+// If registry, table, and session are provided, a dashboard is served at http://localhost:<port>/.
+func NewProxyServer(addr string, san *sanitizer.Sanitizer, reh *sanitizer.Rehydrator, ca *tls.Certificate, reg *scanner.PatternRegistry, table *sanitizer.MappingTable, session *audit.Session) *ProxyServer {
 	p := &ProxyServer{
 		listenAddr: addr,
 		sanitizer:  san,
@@ -37,6 +40,10 @@ func NewProxyServer(addr string, san *sanitizer.Sanitizer, reh *sanitizer.Rehydr
 		goproxy.GoproxyCa = *ca
 		goproxy.OkConnect = &goproxy.ConnectAction{Action: goproxy.ConnectMitm, TLSConfig: goproxy.TLSConfigFromCA(ca)}
 		goproxy.MitmConnect = &goproxy.ConnectAction{Action: goproxy.ConnectMitm, TLSConfig: goproxy.TLSConfigFromCA(ca)}
+	}
+	// Serve dashboard for direct (non-proxy) requests.
+	if reg != nil && table != nil && session != nil {
+		p.proxy.NonproxyHandler = newDashboardHandler(reg, table, session)
 	}
 	p.setup()
 	return p

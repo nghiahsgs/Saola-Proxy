@@ -64,6 +64,17 @@ func (m *MappingTable) Stats() map[string]int {
 	return out
 }
 
+// GetAll returns a copy of all placeholder→original mappings.
+func (m *MappingTable) GetAll() map[string]string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	out := make(map[string]string, len(m.toOriginal))
+	for k, v := range m.toOriginal {
+		out[k] = v
+	}
+	return out
+}
+
 // toUpperSnake converts a pattern name like "aws-access-key" → "AWS_ACCESS_KEY".
 func toUpperSnake(name string) string {
 	return strings.ToUpper(strings.ReplaceAll(name, "-", "_"))

@@ -26,6 +26,13 @@ func (r *PatternRegistry) GetEnabled() []Pattern {
 	return enabled
 }
 
+// GetAll returns all registered patterns (both enabled and disabled).
+func (r *PatternRegistry) GetAll() []Pattern {
+	out := make([]Pattern, len(r.patterns))
+	copy(out, r.patterns)
+	return out
+}
+
 // Disable disables the pattern with the given name.
 func (r *PatternRegistry) Disable(name string) {
 	for i := range r.patterns {
