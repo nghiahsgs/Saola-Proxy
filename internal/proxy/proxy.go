@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/elazarl/goproxy"
 	"github.com/nguyennghia/saola-proxy/internal/sanitizer"
@@ -82,12 +83,26 @@ func (p *ProxyServer) handleRequest(req *http.Request, ctx *goproxy.ProxyCtx) (*
 	return req, nil
 }
 
-// handleResponse reads the response body, rehydrates placeholders, and replaces the body.
+// handleResponse rehydrates placeholders in response bodies.
+// For SSE streaming (text/event-stream), wraps body with streaming reader.
+// For regular responses, reads full body and rehydrates at once.
 func (p *ProxyServer) handleResponse(resp *http.Response, ctx *goproxy.ProxyCtx) *http.Response {
 	if resp == nil || resp.Body == nil {
 		return resp
 	}
 
+	ct := resp.Header.Get("Content-Type")
+
+	// SSE streaming: wrap body with streaming rehydrator (on-the-fly).
+	if strings.Contains(ct, "text/event-stream") {
+		log.Printf("saola proxy: rehydrating SSE stream")
+		resp.Body = newStreamingReader(resp.Body, p.rehydrator.Rehydrate)
+		resp.ContentLength = -1
+		resp.Header.Del("Content-Length")
+		return resp
+	}
+
+	// Regular response: read full body, rehydrate, replace.
 	body, err := io.ReadAll(resp.Body)
 	_ = resp.Body.Close()
 	if err != nil {
@@ -103,7 +118,7 @@ func (p *ProxyServer) handleResponse(resp *http.Response, ctx *goproxy.ProxyCtx)
 	resp.ContentLength = int64(len(rehydratedBytes))
 
 	if len(rehydrated) != len(body) {
-		log.Printf("saola proxy: rehydrated response body (%d → %d bytes)", len(body), len(rehydrated))
+		log.Printf("saola proxy: rehydrated response body (%d \u2192 %d bytes)", len(body), len(rehydrated))
 	}
 
 	return resp
