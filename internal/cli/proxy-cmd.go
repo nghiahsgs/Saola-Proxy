@@ -96,7 +96,7 @@ Then run your AI tool with the proxy:
 		}
 
 		addr := fmt.Sprintf(":%d", proxyPort)
-		ps := proxy.NewProxyServer(addr, san, reh, ca, reg, table, session)
+		ps := proxy.NewProxyServer(addr, san, reh, ca, reg, table, session, cfg)
 
 		fmt.Fprintf(os.Stdout, "Saola proxy listening on :%d\n", proxyPort)
 		fmt.Fprintf(os.Stdout, "Dashboard: http://localhost:%d\n", proxyPort)
