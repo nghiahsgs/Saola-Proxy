@@ -10,6 +10,7 @@ type Pattern struct {
 	Regex       *regexp.Regexp
 	Description string
 	Enabled     bool
+	Validate    func(string) bool // optional post-match validation (e.g. Luhn check)
 }
 
 // Match represents a detected PII occurrence in text.

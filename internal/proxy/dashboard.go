@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -56,6 +57,8 @@ func (d *dashboardHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case r.URL.Path == "/api/stats" && r.Method == http.MethodGet:
 		d.serveStats(w, r)
+	case r.URL.Path == "/api/export/csv" && r.Method == http.MethodGet:
+		d.serveExportCSV(w, r)
 	case strings.HasPrefix(r.URL.Path, "/api/patterns/") && r.Method == http.MethodPost:
 		d.handleToggle(w, r)
 	default:
@@ -158,6 +161,52 @@ func (d *dashboardHandler) saveConfig() error {
 	return d.cfg.WriteToFile(filepath.Join(configDir, "config.yaml"))
 }
 
+// serveExportCSV exports mapping table as CSV with masked original values.
+func (d *dashboardHandler) serveExportCSV(w http.ResponseWriter, _ *http.Request) {
+	mappings := d.table.GetAll()
+	summary := d.session.Summary()
+
+	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+	w.Header().Set("Content-Disposition", "attachment; filename=saola-audit-"+d.session.ID+".csv")
+
+	// Header
+	w.Write([]byte("placeholder,original_masked,session_id,start_time\n"))
+
+	// Sort keys for consistent output.
+	keys := make([]string, 0, len(mappings))
+	for k := range mappings {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	for _, k := range keys {
+		masked := maskPII(mappings[k])
+		// CSV escape: wrap in quotes if contains comma/quote.
+		line := csvField(k) + "," + csvField(masked) + "," + csvField(summary.ID) + "," + csvField(d.startTime.Format("2006-01-02 15:04:05")) + "\n"
+		w.Write([]byte(line))
+	}
+}
+
+// maskPII shows first 3 and last 3 chars, masking the middle.
+func maskPII(v string) string {
+	if len(v) <= 6 {
+		return "***"
+	}
+	mid := len(v) - 6
+	if mid > 20 {
+		mid = 20
+	}
+	return v[:3] + strings.Repeat("*", mid) + v[len(v)-3:]
+}
+
+// csvField wraps a value in quotes if needed for CSV safety.
+func csvField(s string) string {
+	if strings.ContainsAny(s, ",\"\n") {
+		return "\"" + strings.ReplaceAll(s, "\"", "\"\"") + "\""
+	}
+	return s
+}
+
 func (d *dashboardHandler) servePage(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Write([]byte(dashboardHTML))
@@ -208,6 +257,11 @@ const dashboardHTML = `<!DOCTYPE html>
   .toggle:hover .slider { filter: brightness(1.1); }
   .save-note { font-size: 11px; color: #22c55e; opacity: 0; transition: opacity 0.3s; margin-left: 8px; }
   .save-note.show { opacity: 1; }
+  .section-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+  .section-header h2 { margin-bottom: 0; }
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 8px; border: 1px solid #334155; background: #1e293b; color: #e2e8f0; font-size: 13px; cursor: pointer; transition: background 0.2s; text-decoration: none; }
+  .btn:hover { background: #334155; }
+  .btn svg { width: 14px; height: 14px; }
   .refresh-note { font-size: 11px; color: #475569; text-align: center; margin-top: 16px; }
   @media (max-width: 640px) { .cards { grid-template-columns: 1fr; } }
 </style>
@@ -244,7 +298,10 @@ const dashboardHTML = `<!DOCTYPE html>
   </section>
 
   <section>
-    <h2>Mapping Table</h2>
+    <div class="section-header">
+      <h2>Mapping Table</h2>
+      <a href="/api/export/csv" class="btn" id="exportBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export CSV</a>
+    </div>
     <div id="mappingContainer"><div class="empty">No mappings yet</div></div>
   </section>
 

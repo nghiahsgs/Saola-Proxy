@@ -74,6 +74,11 @@ func matchesForPattern(p Pattern, text string) []Match {
 			}
 		}
 
+		// Run optional post-match validation (e.g. Luhn for credit cards).
+		if p.Validate != nil && !p.Validate(value) {
+			continue
+		}
+
 		matches = append(matches, Match{
 			PatternName: p.Name,
 			Category:    p.Category,

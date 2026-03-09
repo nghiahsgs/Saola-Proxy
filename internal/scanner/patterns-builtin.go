@@ -1,6 +1,9 @@
 package scanner
 
-import "regexp"
+import (
+	"regexp"
+	"unicode"
+)
 
 // Compiled regexes at package level for performance.
 var (
@@ -14,7 +17,7 @@ var (
 	reEmail           = regexp.MustCompile(`[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}`)
 	reSSN             = regexp.MustCompile(`\b\d{3}-\d{2}-\d{4}\b`)
 	reCreditCard      = regexp.MustCompile(`\b(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|3[47][0-9]{13}|6(?:011|5[0-9]{2})[0-9]{12})\b`)
-	rePhoneUS         = regexp.MustCompile(`(?:\+?1[-.\s]?)?\(?[0-9]{3}\)?[-.\s]?[0-9]{3}[-.\s]?[0-9]{4}`)
+	rePhoneUS         = regexp.MustCompile(`(?:\+1[-.\s]|1[-.\s])?\([0-9]{3}\)[-.\s]?[0-9]{3}[-.\s][0-9]{4}|(?:\+1[-.\s]|1[-.\s])?[0-9]{3}[-.\s][0-9]{3}[-.\s][0-9]{4}`)
 	reIPv4            = regexp.MustCompile(`\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b`)
 	reEnvVariable     = regexp.MustCompile(`(?i)(?:PASSWORD|SECRET|TOKEN|PRIVATE_KEY|CREDENTIALS)\s*[:=]\s*['"]?([^\s'"]{8,})`)
 )
@@ -90,6 +93,7 @@ func RegisterBuiltins(r *PatternRegistry) {
 		Regex:       reCreditCard,
 		Description: "Credit card number (Visa, MasterCard, Amex, Discover)",
 		Enabled:     true,
+		Validate:    luhnValid,
 	})
 	r.Register(Pattern{
 		Name:        "phone-us",
@@ -112,4 +116,25 @@ func RegisterBuiltins(r *PatternRegistry) {
 		Description: "Environment variable containing a sensitive value",
 		Enabled:     true,
 	})
+}
+
+// luhnValid checks if a string of digits passes the Luhn checksum algorithm.
+func luhnValid(s string) bool {
+	var sum int
+	alt := false
+	for i := len(s) - 1; i >= 0; i-- {
+		if !unicode.IsDigit(rune(s[i])) {
+			continue
+		}
+		n := int(s[i] - '0')
+		if alt {
+			n *= 2
+			if n > 9 {
+				n -= 9
+			}
+		}
+		sum += n
+		alt = !alt
+	}
+	return sum > 0 && sum%10 == 0
 }
