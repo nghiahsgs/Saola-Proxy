@@ -22,7 +22,7 @@ func buildProxy(t *testing.T) (*proxy.ProxyServer, *sanitizer.MappingTable) {
 	table := sanitizer.NewMappingTable()
 	san := sanitizer.NewSanitizer(sc, table)
 	reh := sanitizer.NewRehydrator(table)
-	ps := proxy.NewProxyServer("127.0.0.1:0", san, reh)
+	ps := proxy.NewProxyServer("127.0.0.1:0", san, reh, nil)
 	return ps, table
 }
 

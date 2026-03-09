@@ -4,6 +4,7 @@ package proxy
 
 import (
 	"bytes"
+	"crypto/tls"
 	"io"
 	"log"
 	"net/http"
@@ -22,12 +23,19 @@ type ProxyServer struct {
 
 // NewProxyServer creates a ProxyServer that listens on addr and applies
 // PII sanitization to traffic targeting api.anthropic.com.
-func NewProxyServer(addr string, san *sanitizer.Sanitizer, reh *sanitizer.Rehydrator) *ProxyServer {
+// If ca is provided, it is used for MITM certificate signing.
+func NewProxyServer(addr string, san *sanitizer.Sanitizer, reh *sanitizer.Rehydrator, ca *tls.Certificate) *ProxyServer {
 	p := &ProxyServer{
 		listenAddr: addr,
 		sanitizer:  san,
 		rehydrator: reh,
 		proxy:      goproxy.NewProxyHttpServer(),
+	}
+	// Use custom CA for MITM if provided.
+	if ca != nil {
+		goproxy.GoproxyCa = *ca
+		goproxy.OkConnect = &goproxy.ConnectAction{Action: goproxy.ConnectMitm, TLSConfig: goproxy.TLSConfigFromCA(ca)}
+		goproxy.MitmConnect = &goproxy.ConnectAction{Action: goproxy.ConnectMitm, TLSConfig: goproxy.TLSConfigFromCA(ca)}
 	}
 	p.setup()
 	return p

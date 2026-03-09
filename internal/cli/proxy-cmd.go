@@ -86,8 +86,17 @@ Then run your AI tool with the proxy:
 			session.RecordRehydration()
 		}
 
+		// Load CA certificate for MITM.
+		if !proxy.CAExists() {
+			return fmt.Errorf("CA certificate not found. Run 'saola setup-ca' first")
+		}
+		ca, err := proxy.LoadCA()
+		if err != nil {
+			return fmt.Errorf("load CA: %w", err)
+		}
+
 		addr := fmt.Sprintf(":%d", proxyPort)
-		ps := proxy.NewProxyServer(addr, san, reh)
+		ps := proxy.NewProxyServer(addr, san, reh, ca)
 
 		fmt.Fprintf(os.Stdout, "Saola proxy listening on :%d — Use: HTTPS_PROXY=http://localhost:%d claude\n", proxyPort, proxyPort)
 
