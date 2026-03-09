@@ -2,15 +2,15 @@
 
 > The Asian Unicorn — A privacy gateway for AI coding assistants.
 
-Saola Proxy intercepts communication between you and AI coding tools (Claude Code, etc.), automatically detecting and masking sensitive data (API keys, emails, tokens, credentials) before it reaches external servers. When responses come back, Saola rehydrates the placeholders with your original values.
+Saola Proxy intercepts API calls between you and AI coding tools (Claude Code, etc.), automatically detecting and masking sensitive data (API keys, emails, tokens, credentials) before it reaches external servers.
 
 **Your secrets never leave your machine.**
 
 ## Features
 
+- **HTTPS Proxy mode** — Intercepts API calls at network level, works with any AI tool
 - **13+ PII patterns** — Detects AWS keys, GitHub tokens, Stripe keys, emails, SSN, credit cards, JWTs, private keys, and more
-- **Bidirectional sanitization** — Masks outgoing data, restores incoming responses
-- **Deterministic placeholders** — `[EMAIL_1]`, `[AWS_ACCESS_KEY_1]` for readable, reversible masking
+- **Deterministic placeholders** — `[EMAIL_1]`, `[AWS_ACCESS_KEY_1]` for readable masking
 - **Configurable** — YAML config for custom patterns, whitelists, and settings
 - **Audit logging** — Session stats without storing PII
 - **Single binary** — Zero runtime dependencies, cross-platform
@@ -18,91 +18,89 @@ Saola Proxy intercepts communication between you and AI coding tools (Claude Cod
 
 ## Quick Start
 
-### Install
+### 1. Install
 
 ```bash
-# Option 1: go install (requires Go 1.22+)
-go install github.com/nguyennghia/saola-proxy/cmd/saola@latest
-
-# Option 2: Build from source
-git clone https://github.com/nguyennghia/saola-proxy.git
-cd saola-proxy
+# Option 1: Build from source (requires Go 1.22+)
+git clone https://github.com/nghiahsgs/Saola-Proxy.git
+cd Saola-Proxy
 make build
-sudo cp bin/saola /usr/local/bin/   # or add bin/ to your PATH
+sudo cp bin/saola /usr/local/bin/
 
-# Option 3: Download binary from GitHub Releases
-# https://github.com/nguyennghia/saola-proxy/releases
+# Option 2: go install
+go install github.com/nguyennghia/saola-proxy/cmd/saola@latest
 ```
 
-### Verify Installation
+### 2. Setup CA Certificate (one-time)
+
+Saola needs a trusted CA certificate to intercept HTTPS traffic:
 
 ```bash
-saola version
-# Output: saola version v0.1.0
+saola setup-ca
+# Enter sudo password when prompted
 ```
 
-### Usage
+This generates a local CA at `~/.saola/ca.crt` and installs it to your system trust store.
+
+### 3. Start the Proxy
 
 ```bash
-# Wrap any CLI tool with PII sanitization
-saola wrap -- claude
-
-# Works with any command
-saola wrap -- bash
-saola wrap -- python3 my_script.py
-
-# Wrap with explicit config file
-saola --config ~/.saola/config.yaml wrap -- claude
-
-# Initialize default config
-saola init
-
-# View audit stats from past sessions
-saola audit
+# Terminal 1: Start Saola proxy
+saola proxy
 ```
 
-### Shortcut: Create an Alias
+```bash
+# Terminal 2: Run Claude Code through the proxy
+NODE_EXTRA_CA_CERTS=~/.saola/ca.crt HTTPS_PROXY=http://localhost:8080 claude
+```
+
+### 4. Create an Alias (recommended)
 
 Add to your `~/.zshrc` or `~/.bashrc`:
 
 ```bash
-alias claude='saola wrap -- claude'
+alias claude-safe='NODE_EXTRA_CA_CERTS=~/.saola/ca.crt HTTPS_PROXY=http://localhost:8080 claude'
 ```
 
-Then just type `claude` as usual — Saola runs transparently in the background.
-
-### Example
-
-```
-$ echo "My API key is AKIAIOSFODNN7EXAMPLE and email is john@company.com" | saola wrap -- cat
-My API key is [AWS_ACCESS_KEY_1] and email is [EMAIL_1]
-```
-
-The AI tool only sees `[AWS_ACCESS_KEY_1]` and `[EMAIL_1]`. Your real credentials never leave your machine.
+Then just type `claude-safe` — Saola sanitizes all API calls transparently.
 
 ## How It Works
 
 ```
-You ──► Saola (sanitize) ──► AI Tool ──► AI Server
-You ◄── Saola (rehydrate) ◄── AI Tool ◄── AI Server
+You type: "Fix the bug, my email is john@company.com"
+                          ↓
+Saola intercepts the API call to api.anthropic.com
+                          ↓
+Anthropic receives: "Fix the bug, my email is [EMAIL_1]"
+                          ↓
+AI responds with [EMAIL_1] (never sees real email)
+                          ↓
+You see the response (with [EMAIL_1] placeholder)
 ```
 
-1. Saola wraps the target process in a pseudo-terminal
-2. Outgoing text is scanned for PII patterns
-3. Detected PII is replaced with deterministic placeholders
-4. AI processes the sanitized text
-5. Responses containing placeholders are restored to original values
+Saola acts as an HTTPS MITM proxy — it intercepts traffic **only** to `api.anthropic.com`, sanitizes PII in request bodies, and passes everything else through untouched.
+
+## Commands
+
+```bash
+saola setup-ca           # Generate and install CA certificate (one-time)
+saola proxy              # Start HTTPS proxy on :8080
+saola proxy --port 9090  # Start on custom port
+saola init               # Create default config at ~/.saola/config.yaml
+saola audit              # View sanitization stats from past sessions
+saola version            # Print version
+```
 
 ## Built-in Patterns
 
 | Pattern | Category | Example |
 |---------|----------|---------|
-| AWS Access Key | credential | `AKIA...` |
+| AWS Access Key | secret | `AKIA...` |
 | GitHub Token | secret | `ghp_...` |
 | Stripe Key | secret | `sk_live_...` |
 | Generic API Key | secret | `api_key=...` |
-| Private Key | credential | `-----BEGIN RSA PRIVATE KEY-----` |
-| JWT | secret | `eyJ...` |
+| Private Key | secret | `-----BEGIN RSA PRIVATE KEY-----` |
+| JWT | credential | `eyJ...` |
 | Connection String | credential | `postgres://...` |
 | Email | pii | `user@example.com` |
 | SSN | pii | `123-45-6789` |
@@ -123,15 +121,19 @@ log_level: info
 audit_enabled: true
 
 patterns:
+  # Disable patterns you don't need
   disabled:
     - phone-us
     - ipv4-address
+
+  # Add your own patterns
   custom:
     - name: internal-token
       category: secret
       regex: "INTERNAL_[A-Z0-9]{32}"
       description: "Internal API tokens"
 
+# Values that should never be masked
 whitelist:
   - "127.0.0.1"
   - "localhost"
@@ -145,15 +147,20 @@ whitelist:
 saola audit  # View recent sessions
 ```
 
-Audit logs track detection counts (not PII values):
+Audit logs track detection counts only (never PII values):
 ```json
 {
   "session_id": "20260308-143022",
-  "command": "claude",
+  "command": "proxy",
   "detections": {"email": 3, "aws-access-key": 1},
   "total_sanitized": 4
 }
 ```
+
+## Limitations
+
+- **Response rehydration** — Claude API uses SSE streaming for responses. Rehydrating placeholders in streaming responses is not yet supported. You'll see `[EMAIL_1]` in AI responses instead of the original value.
+- **macOS/Linux only** — Windows is not supported yet (PTY and Keychain differences).
 
 ## Development
 
