@@ -199,12 +199,13 @@ const dashboardHTML = `<!DOCTYPE html>
   .empty { text-align: center; color: #64748b; padding: 32px; font-size: 14px; }
   .bar { display: flex; align-items: center; gap: 8px; }
   .bar-fill { height: 6px; border-radius: 3px; background: #3b82f6; min-width: 4px; }
-  .toggle { position: relative; width: 44px; height: 24px; cursor: pointer; }
-  .toggle input { opacity: 0; width: 0; height: 0; }
-  .toggle .slider { position: absolute; inset: 0; background: #475569; border-radius: 12px; transition: background 0.2s; }
-  .toggle .slider:before { content: ''; position: absolute; width: 18px; height: 18px; left: 3px; top: 3px; background: #f8fafc; border-radius: 50%; transition: transform 0.2s; }
+  .toggle { position: relative; display: inline-block; width: 52px; height: 28px; cursor: pointer; vertical-align: middle; }
+  .toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
+  .toggle .slider { position: absolute; inset: 0; background: #ef4444; border-radius: 14px; transition: background 0.3s; box-shadow: inset 0 1px 3px rgba(0,0,0,0.3); }
+  .toggle .slider:before { content: ''; position: absolute; width: 22px; height: 22px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: transform 0.3s; box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
   .toggle input:checked + .slider { background: #22c55e; }
-  .toggle input:checked + .slider:before { transform: translateX(20px); }
+  .toggle input:checked + .slider:before { transform: translateX(24px); }
+  .toggle:hover .slider { filter: brightness(1.1); }
   .save-note { font-size: 11px; color: #22c55e; opacity: 0; transition: opacity 0.3s; margin-left: 8px; }
   .save-note.show { opacity: 1; }
   .refresh-note { font-size: 11px; color: #475569; text-align: center; margin-top: 16px; }
